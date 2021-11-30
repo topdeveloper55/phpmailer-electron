@@ -33,6 +33,8 @@ const themeDark = createTheme({
 const Hello = () => {
   const [e_count, setE_count] = useState(0);
   const [s_count, setS_count] = useState(0);
+  const [sf_count, setSf_count] = useState(0);
+  const [st_count, setSt_count] = useState(0);
   const [used_count, setUsed_count] = useState(0);
   const [send_enable, setSend_enable] = useState(false);
   const [successStatus, setSuccessStatus] = useState([]);
@@ -51,7 +53,7 @@ const Hello = () => {
   useEffect(() => {
     if (e_count && totalCount + failedCount === e_count) {
       setFinished(true);
-    };
+    }
   }, [totalCount, failedCount]);
 
   const emailUpload = (): void => {
@@ -63,9 +65,12 @@ const Hello = () => {
 
   const serverUpload = (): void => {
     window.electron.ipcRenderer.on('server-upload', (event, args) => {
-      console.log('args: ', args);
-      setS_count(args.length);
+      setS_count(args.successLength);
+      setSf_count(args.failedLength);
       setServers(args.data);
+    });
+    window.electron.ipcRenderer.on('total-server', (event, args) => {
+      setSt_count(args);
     });
     window.electron.ipcRenderer.send('server-upload');
   };
@@ -106,30 +111,30 @@ const Hello = () => {
             <Paper elevation={5} sx={{ mr: 2 }}>
               <Box p={2}>
                 <Box display="flex" alignItems="center" marginBottom="20px">
-                  <Typography marginRight="20px">Email List:</Typography>
                   <Button
                     color="success"
                     size="medium"
                     variant="contained"
-                    sx={{ marginRight: '20px' }}
+                    sx={{ marginRight: '20px', width: '190px' }}
                     onClick={emailUpload}
                   >
-                    Upload File
+                    Upload EmailList
                   </Button>
                   <Typography>{e_count} emails</Typography>
                 </Box>
                 <Box display="flex" alignItems="center">
-                  <Typography marginRight="20px">Server List:</Typography>
                   <Button
                     color="success"
                     size="medium"
                     variant="contained"
-                    sx={{ marginRight: '20px' }}
+                    sx={{ marginRight: '20px', width: '190px' }}
                     onClick={serverUpload}
                   >
-                    Upload File
+                    Upload ServerList
                   </Button>
-                  <Typography>{s_count} servers</Typography>
+                  <Typography>
+                    Working/not({st_count}):{s_count}/{sf_count}
+                  </Typography>
                 </Box>
               </Box>
               <Divider />
@@ -194,7 +199,7 @@ const Hello = () => {
               </Box>
               <Divider />
 
-              <Box p={2} height={400} overflow="auto">
+              <Box p={2} height={500} overflow="auto">
                 <TableContainer component={Paper}>
                   <Table sx={{ minWidth: 650 }} aria-label="simple table">
                     <TableHead>
@@ -218,7 +223,9 @@ const Hello = () => {
                           </TableCell>
                           <TableCell>{servers[i]}</TableCell>
                           <TableCell align="right">{item} success</TableCell>
-                          <TableCell align="right">{errorStatus[i]} failed</TableCell>
+                          <TableCell align="right">
+                            {errorStatus[i]} failed
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>

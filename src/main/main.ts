@@ -15,9 +15,10 @@ import { app, BrowserWindow, shell, ipcMain, dialog } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import log from 'electron-log';
 import MenuBuilder from './menu';
-import { resolveHtmlPath, sendEmailPerServer } from './util';
+import { resolveHtmlPath, sendEmailPerServer, serverChecking } from './util';
 import fs from 'fs';
 import axios from 'axios';
+import qs from 'qs';
 
 const config = {
   headers: {
@@ -30,6 +31,7 @@ const config = {
 
 var email_list = [];
 var server_list = [];
+var failed_count = 0;
 
 export default class AppUpdater {
   constructor() {
@@ -166,20 +168,53 @@ ipcMain.on('email-upload', async (event, arg) => {
   // console.log('path', file_path.filePaths[0]);
 });
 
+// handling server-upload
 ipcMain.on('server-upload', async (event, arg) => {
+  server_list = [];
+  failed_count = 0;
   let file_path = await dialog.showOpenDialog({
     properties: ['openFile', 'multiSelections'],
   });
   if (!file_path.canceled && file_path.filePaths.length > 0) {
-    fs.readFile(file_path.filePaths[0], 'utf8', (err, data) => {
+    fs.readFile(file_path.filePaths[0], 'utf8', async (err, data) => {
       if (err) throw err;
       let servers = data.split('\r\n');
-      server_list = [...servers];
-      // console.log('servers:', server_list);
-      event.reply('server-upload', {
-        length: servers.length,
-        data: server_list,
-      });
+      event.reply('total-server', servers.length);
+      for (let i = 0; i < servers.length; i++) {
+        axios
+          .post(
+            servers[i],
+            qs.stringify({
+              senderEmail: 'support@nagoya-boushi.org',
+              senderName: 'test',
+              subject: 'Server Testing',
+              messageLetter: 'Hello, How are you?',
+              emailList: 'joaqperalta95@gmail.com',
+              messageType: '1',
+              charset: 'UTF-8',
+              encode: '8bit',
+              action: 'send',
+            })
+          )
+          .then((res) => {
+            server_list.push(servers[i]);
+            event.reply('server-upload', {
+              successLength: server_list.length,
+              failedLength: failed_count,
+              data: server_list,
+            });
+            console.log('checking success');
+          })
+          .catch((err) => {
+            console.log('checking error');
+            failed_count++;
+            event.reply('server-upload', {
+              successLength: server_list.length,
+              failedLength: failed_count,
+              data: server_list,
+            });
+          });
+      }
     });
   }
 });
