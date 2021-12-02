@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, ChangeEvent } from 'react';
 import { MemoryRouter as Router, Switch, Route } from 'react-router-dom';
 import CssBaseline from '@mui/material/CssBaseline';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
@@ -23,6 +23,7 @@ import {
   Checkbox,
   Slider,
 } from '@mui/material';
+import { Pagination } from '@mui/lab';
 import { UplSerData, ResponseData } from '../type';
 
 const themeDark = createTheme({
@@ -59,6 +60,7 @@ const Hello = () => {
   const [failedCount, setFailedCount] = useState(0);
   const [servers, setServers] = useState<string[]>([]);
   const [finished, setFinished] = useState(false);
+  const [page, setPage] = useState(0);
 
   useEffect(() => {
     if (
@@ -69,11 +71,21 @@ const Hello = () => {
       namCount &&
       senEmailsCount &&
       subCount &&
-      mesTitle
+      mesTitle &&
+      limit * usedCount >= ecount
     )
       setSendEnable(true);
     else setSendEnable(false);
-  }, [ecount, scount, usedCount, namCount, senEmailsCount, subCount, mesTitle]);
+  }, [
+    limit,
+    ecount,
+    scount,
+    usedCount,
+    namCount,
+    senEmailsCount,
+    subCount,
+    mesTitle,
+  ]);
 
   useEffect(() => {
     if (ecount && totalCount + failedCount === ecount) {
@@ -197,6 +209,50 @@ const Hello = () => {
         setErrorStatus(failedMails);
       }
     );
+  };
+
+  const handleResend = (): void => {
+    setEcount(failedCount);
+    setTotalCount(0);
+    setFailedCount(0);
+    const buf = new Set(servers);
+    for (let i = 0; i < errorStatus.length; i += 1) {
+      if (errorStatus[i] > 0) buf.delete(servers[i]);
+    }
+    const bufArr = Array.from(buf);
+    setServers(bufArr);
+    window.electron.ipcRenderer.send('resend', bufArr);
+    handleSend();
+  };
+
+  const handleClear = (): void => {
+    setEcount(0);
+    setScount(0);
+    setSfcount(0);
+    setStcount(0);
+    setUsedCount(0);
+    setNamCount(0);
+    setSubCount(0);
+    setSenEmailsCount(0);
+    setMesTitle('');
+    setAttTitle('');
+    setRanNamStatus(false);
+    setRanSubStatus(false);
+    setRanSenEmaStatus(false);
+    setLimit(100);
+    setCouPerReplace(1000);
+    setSendEnable(false);
+    setSuccessStatus([]);
+    setErrorStatus([]);
+    setTotalCount(0);
+    setFailedCount(0);
+    setServers([]);
+    setFinished(false);
+    window.electron.ipcRenderer.send('clear-all');
+  };
+
+  const handlePagination = (event: ChangeEvent, num: string): void => {
+    setPage(num - 1);
   };
 
   return (
@@ -395,10 +451,26 @@ const Hello = () => {
                 />
               </Box>
               {finished && (
-                <Box textAlign="center">
-                  <Typography variant="h3" color="red">
+                <Box
+                  px={2}
+                  display="flex"
+                  alignContent="space-between"
+                  textAlign="center"
+                >
+                  <Typography
+                    variant="h4"
+                    color="red"
+                    sx={{ marginRight: '20px' }}
+                  >
                     Finished
                   </Typography>
+                  <Button
+                    color="warning"
+                    variant="contained"
+                    onClick={handleClear}
+                  >
+                    Clear All
+                  </Button>
                 </Box>
               )}
             </Paper>
@@ -408,17 +480,31 @@ const Hello = () => {
             <Paper elevation={5}>
               <Box p={2}>
                 <Box display="flex" justifyContent="space-around">
-                  <Typography variant="h6">Shpping Log</Typography>
+                  <Button
+                    variant="contained"
+                    color="warning"
+                    onClick={handleResend}
+                  >
+                    Resend
+                  </Button>
                   <Typography variant="h6">
                     Total Servers: {scount}
                     <span style={{ color: 'red' }}>({usedCount} used)</span>
                   </Typography>
                   <Typography variant="h6">
-                    Total emails sent:{' '}
-                    <span style={{ color: 'red' }}>
+                    Proceed:{' '}
+                    <span color="red">
                       {totalCount}({failedCount} failed)
                     </span>
                   </Typography>
+                  <CircularProgress
+                    variant="determinate"
+                    value={
+                      totalCount > 0
+                        ? ((totalCount + failedCount) * 100) / ecount
+                        : 0
+                    }
+                  />
                 </Box>
               </Box>
               <Divider />
@@ -435,28 +521,35 @@ const Hello = () => {
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {successStatus.map((item, i) => (
-                        <TableRow
-                          key={i}
-                          sx={{
-                            '&:last-child td, &:last-child th': { border: 0 },
-                          }}
-                        >
-                          <TableCell component="th" scope="row">
-                            Server {i}:
-                          </TableCell>
-                          <TableCell>{servers[i]}</TableCell>
-                          <TableCell align="right">{item} success</TableCell>
-                          <TableCell align="right">
-                            {errorStatus[i]} failed
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                      {successStatus
+                        .slice(page * 15, (page + 1) * 15)
+                        .map((item, i) => (
+                          <TableRow
+                            key={i}
+                            sx={{
+                              '&:last-child td, &:last-child th': { border: 0 },
+                            }}
+                          >
+                            <TableCell component="th" scope="row">
+                              Server {page * 15 + i}:
+                            </TableCell>
+                            <TableCell>{servers[page * 15 + i]}</TableCell>
+                            <TableCell align="right">{item} success</TableCell>
+                            <TableCell align="right">
+                              {errorStatus[page * 15 + i]} failed
+                            </TableCell>
+                          </TableRow>
+                        ))}
                     </TableBody>
                   </Table>
                 </TableContainer>
               </Box>
             </Paper>
+            <Pagination
+              count={Math.floor(usedCount / 15) + 1}
+              color="primary"
+              onChange={handlePagination}
+            />
           </Grid>
         </Grid>
       </Container>

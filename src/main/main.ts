@@ -47,8 +47,7 @@ global.total = 0;
 global.subject = '';
 global.senName = '';
 global.senEmail = '';
-
-
+global.failedEmails = [];
 export default class AppUpdater {
   constructor() {
     log.transports.file.level = 'info';
@@ -210,6 +209,10 @@ ipcMain.on(
     limitPerServer = args.limit;
     couPerReplace = args.couPerReplace;
     total = 0;
+    if(failedEmails.length > 0) {
+      emailList = failedEmails;
+      failedEmails = [];
+    }
     while (total < emailList.length) {
       for (let i = 0; i < usedCount; i += 1) {
         if (total + 10 > emailList.length) {
@@ -293,4 +296,28 @@ ipcMain.on('attachement-upload', async (event: IpcMainEvent): Promise<void> => {
       event.reply('attachement-upload', fileName);
     });
   }
+});
+
+ipcMain.on('clear-all', (event: IpcMainEvent): void => {
+  emailList = [];
+  serverList = [];
+  names = [];
+  subjects = [];
+  senEmails = [];
+  message = '';
+  ranNamStatus = false;
+  ranSenEmaStatus = false;
+  ranSubStatus = false;
+  usedCount = 0;
+  limitPerServer = 100;
+  couPerReplace = 1000;
+  failedCount = 0;
+  total = 0;
+  subject = '';
+  senName = '';
+  senEmail = '';
+});
+
+ipcMain.on('resend', (event: IpcMainEvent, args: string[]): void => {
+  serverList = args;
 });

@@ -4,7 +4,7 @@ import { URL } from 'url';
 import path from 'path';
 import axios from 'axios';
 import qs from 'qs';
-import FormData from 'form-data';
+//import FormData from 'form-data';
 
 const config = {
   headers: {
@@ -13,7 +13,7 @@ const config = {
   },
 };
 
-let formData: FormData = new FormData();
+//let formData: FormData = new FormData();
 
 export let resolveHtmlPath: (htmlFileName: string) => string;
 
@@ -31,7 +31,7 @@ if (process.env.NODE_ENV === 'development') {
 }
 
 const createFormData = (ranStatus: boolean): void => {
-  formData = new FormData();
+  //formData = new FormData();
   if (ranStatus) {
     senEmail = ranSenEmaStatus
       ? senEmails[Math.floor(Math.random() * senEmails.length)]
@@ -43,16 +43,16 @@ const createFormData = (ranStatus: boolean): void => {
       ? subjects[Math.floor(Math.random() * subjects.length)]
       : subjects[0];
   }
-  formData.append('senderEmail', senEmail);
-  formData.append('senderName', senName);
-  formData.append('subject', subject);
-  formData.append('attachment', attachment, fileName);
-  formData.append('replyTo', '');
-  formData.append('messageLetter', message);
-  formData.append('messageType', '1');
-  formData.append('charset', 'UTF-8');
-  formData.append('encode', '8bit');
-  formData.append('action', 'send');
+  // formData.append('senderEmail', senEmail);
+  // formData.append('senderName', senName);
+  // formData.append('subject', subject);
+  // formData.append('attachment', attachment, fileName);
+  // formData.append('replyTo', '');
+  // formData.append('messageLetter', message);
+  // formData.append('messageType', '1');
+  // formData.append('charset', 'UTF-8');
+  // formData.append('encode', '8bit');
+  // formData.append('action', 'send');
 };
 
 export const sendEmailPerServer = async (
@@ -63,15 +63,33 @@ export const sendEmailPerServer = async (
 ): Promise<void> => {
   let emails = emailList.slice(from, to).join('\r\n');
   createFormData(from % couPerReplace < 10);
-  formData.append('emailList', emails);
+  //formData.append('emailList', emails);
   try {
-    let res = await axios.post(serverList[serverNum], formData, config);
+    let res = await axios.post(
+      serverList[serverNum],
+      qs.stringify({
+        senderEmail: senEmail,
+        senderName: senName,
+        subject: subject,
+        messageLetter: message,
+        emailList: emails,
+        messageType: '1',
+        charset: 'UTF-8',
+        encode: '8bit',
+        action: 'send',
+      }),
+      config
+    );
     if (res)
       event.reply('sending-success', {
         serverNum: serverNum,
         count: to - from,
       });
   } catch (err) {
+    for (let i = from; i < to; i += 1) {
+      failedEmails.push(emailList[i]);
+    }
+    //serverList.splice(serverNum, 1);
     event.reply('sending-error', {
       serverNum: serverNum,
       count: to - from,
