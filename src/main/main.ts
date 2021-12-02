@@ -11,27 +11,43 @@
 import 'core-js/stable';
 import 'regenerator-runtime/runtime';
 import path from 'path';
-import { app, BrowserWindow, shell, ipcMain, dialog } from 'electron';
+import {
+  app,
+  BrowserWindow,
+  shell,
+  ipcMain,
+  dialog,
+  IpcMainEvent,
+} from 'electron';
+import fs from 'fs';
+import FormData from 'form-data';
 import { autoUpdater } from 'electron-updater';
 import log from 'electron-log';
 import MenuBuilder from './menu';
-import { resolveHtmlPath, sendEmailPerServer, serverChecking } from './util';
-import fs from 'fs';
-import axios from 'axios';
-import qs from 'qs';
+import { resolveHtmlPath, sendEmailPerServer, serverTesting } from './util';
+import { SendData } from '../type';
 
-const config = {
-  headers: {
-    'Content-Type': 'multipart/form-data',
-    connection: 'keep-alive',
-    'Accept-Encoding': 'gzip, deflate',
-    Accept: '*/*',
-  },
-};
+process.setMaxListeners(Infinity);
 
-var email_list = [];
-var server_list = [];
-var failed_count = 0;
+global.emailList = [];
+global.serverList = [];
+global.names = [];
+global.subjects = [];
+global.senEmails = [];
+global.message = '';
+global.ranNamStatus = false;
+global.ranSenEmaStatus = false;
+global.ranSubStatus = false;
+global.usedCount = 0;
+global.limitPerServer = 100;
+global.couPerReplace = 1000;
+global.failedCount = 0;
+global.total = 0;
+//form data
+global.subject = '';
+global.senName = '';
+global.senEmail = '';
+
 
 export default class AppUpdater {
   constructor() {
@@ -152,90 +168,129 @@ app
   })
   .catch(console.log);
 
-ipcMain.on('email-upload', async (event, arg) => {
-  let file_path = await dialog.showOpenDialog({
+ipcMain.on('email-upload', async (event: IpcMainEvent): Promise<void> => {
+  const filePath = await dialog.showOpenDialog({
     properties: ['openFile', 'multiSelections'],
   });
-  if (!file_path.canceled && file_path.filePaths.length > 0) {
-    fs.readFile(file_path.filePaths[0], 'utf8', (err, data) => {
+  if (!filePath.canceled && filePath.filePaths.length > 0) {
+    fs.readFile(filePath.filePaths[0], 'utf8', (err, data) => {
       if (err) throw err;
-      let emails = data.split('\r\n');
-      email_list = [...emails];
-      // console.log('emails:', email_list);
-      event.reply('email-upload', emails.length);
+      emailList = data.split('\r\n');
+      event.reply('email-upload', emailList.length);
     });
   }
-  // console.log('path', file_path.filePaths[0]);
 });
 
 // handling server-upload
-ipcMain.on('server-upload', async (event, arg) => {
-  server_list = [];
-  failed_count = 0;
-  let file_path = await dialog.showOpenDialog({
+ipcMain.on('server-upload', async (event: IpcMainEvent): Promise<void> => {
+  serverList = [];
+  failedCount = 0;
+  let filePath = await dialog.showOpenDialog({
     properties: ['openFile', 'multiSelections'],
   });
-  if (!file_path.canceled && file_path.filePaths.length > 0) {
-    fs.readFile(file_path.filePaths[0], 'utf8', async (err, data) => {
+  if (!filePath.canceled && filePath.filePaths.length > 0) {
+    fs.readFile(filePath.filePaths[0], 'utf8', async (err, data) => {
       if (err) throw err;
-      let servers = data.split('\r\n');
+      const servers = data.split('\r\n');
       event.reply('total-server', servers.length);
-      for (let i = 0; i < servers.length; i++) {
-        axios
-          .post(
-            servers[i],
-            qs.stringify({
-              senderEmail: 'support@nagoya-boushi.org',
-              senderName: 'test',
-              subject: 'Server Testing',
-              messageLetter: 'Hello, How are you?',
-              emailList: 'joaqperalta95@gmail.com',
-              messageType: '1',
-              charset: 'UTF-8',
-              encode: '8bit',
-              action: 'send',
-            })
-          )
-          .then((res) => {
-            server_list.push(servers[i]);
-            event.reply('server-upload', {
-              successLength: server_list.length,
-              failedLength: failed_count,
-              data: server_list,
-            });
-            console.log('checking success');
-          })
-          .catch((err) => {
-            console.log('checking error');
-            failed_count++;
-            event.reply('server-upload', {
-              successLength: server_list.length,
-              failedLength: failed_count,
-              data: server_list,
-            });
-          });
+      for (let i = 0; i < servers.length; i += 1) {
+        serverTesting(event, servers[i]);
       }
     });
   }
 });
 
-ipcMain.on('send-action', async (event, arg) => {
-  console.log('arg', arg);
-  let countPerServer = parseInt(email_list.length / arg);
-  for (let i = 0; i < arg; i++) {
-    if (i === arg - 1)
-      sendEmailPerServer(
-        event,
-        server_list[i],
-        i,
-        email_list.slice(i * countPerServer)
-      );
-    else
-      sendEmailPerServer(
-        event,
-        server_list[i],
-        i,
-        email_list.slice(i * countPerServer, (i + 1) * countPerServer)
-      );
+ipcMain.on(
+  'send-action',
+  async (event: IpcMainEvent, args: SendData): Promise<void> => {
+    ranNamStatus = args.ranNamStatus;
+    ranSenEmaStatus = args.ranSenEmaStatus;
+    ranSubStatus = args.ranSubStatus;
+    usedCount = args.usedCount;
+    limitPerServer = args.limit;
+    couPerReplace = args.couPerReplace;
+    total = 0;
+    while (total < emailList.length) {
+      for (let i = 0; i < usedCount; i += 1) {
+        if (total + 10 > emailList.length) {
+          sendEmailPerServer(event, i, total, emailList.length);
+          total = emailList.length;
+        } else {
+          sendEmailPerServer(event, i, total, total + 10);
+          total += 10;
+        }
+      }
+    }
+  }
+);
+
+ipcMain.on('names-upload', async (event: IpcMainEvent): Promise<void> => {
+  const filePath = await dialog.showOpenDialog({
+    properties: ['openFile', 'multiSelections'],
+  });
+  if (!filePath.canceled && filePath.filePaths.length > 0) {
+    fs.readFile(filePath.filePaths[0], 'utf8', (err, data) => {
+      if (err) throw err;
+      names = data.split('\r\n');
+
+      event.reply('names-upload', names.length);
+    });
+  }
+});
+
+ipcMain.on('subjects-upload', async (event: IpcMainEvent): Promise<void> => {
+  const filePath = await dialog.showOpenDialog({
+    properties: ['openFile', 'multiSelections'],
+  });
+  if (!filePath.canceled && filePath.filePaths.length > 0) {
+    fs.readFile(filePath.filePaths[0], 'utf8', (err, data) => {
+      if (err) throw err;
+      subjects = data.split('\r\n');
+
+      event.reply('subjects-upload', subjects.length);
+    });
+  }
+});
+
+ipcMain.on('senEmails-upload', async (event: IpcMainEvent): Promise<void> => {
+  const filePath = await dialog.showOpenDialog({
+    properties: ['openFile', 'multiSelections'],
+  });
+  if (!filePath.canceled && filePath.filePaths.length > 0) {
+    fs.readFile(filePath.filePaths[0], 'utf8', (err, data) => {
+      if (err) throw err;
+      senEmails = data.split('\r\n');
+
+      event.reply('senEmails-upload', senEmails.length);
+    });
+  }
+});
+
+ipcMain.on('message-upload', async (event: IpcMainEvent): Promise<void> => {
+  const filePath = await dialog.showOpenDialog({
+    properties: ['openFile', 'multiSelections'],
+  });
+  if (!filePath.canceled && filePath.filePaths.length > 0) {
+    fs.readFile(filePath.filePaths[0], 'utf8', (err, data) => {
+      if (err) throw err;
+      message = data;
+
+      event.reply('message-upload', path.basename(filePath.filePaths[0]));
+    });
+  }
+});
+
+ipcMain.on('attachement-upload', async (event: IpcMainEvent): Promise<void> => {
+  const filePath = await dialog.showOpenDialog({
+    properties: ['openFile', 'multiSelections'],
+  });
+  if (!filePath.canceled && filePath.filePaths.length > 0) {
+    fs.readFile(filePath.filePaths[0], (err, data) => {
+      if (err) throw err;
+      global.attachment = data;
+      global.fileName = path.basename(filePath.filePaths[0]);
+
+      event.reply('attachement-upload', fileName);
+    });
   }
 });

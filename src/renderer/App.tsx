@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { MemoryRouter as Router, Switch, Route } from 'react-router-dom';
 import CssBaseline from '@mui/material/CssBaseline';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
+import { IpcMainEvent } from 'electron';
 import {
   Container,
   Box,
@@ -17,7 +18,12 @@ import {
   TableBody,
   TableCell,
   TableRow,
+  CircularProgress,
+  FormControlLabel,
+  Checkbox,
+  Slider,
 } from '@mui/material';
+import { UplSerData, ResponseData } from '../type';
 
 const themeDark = createTheme({
   palette: {
@@ -31,75 +37,166 @@ const themeDark = createTheme({
 });
 
 const Hello = () => {
-  const [e_count, setE_count] = useState(0);
-  const [s_count, setS_count] = useState(0);
-  const [sf_count, setSf_count] = useState(0);
-  const [st_count, setSt_count] = useState(0);
-  const [used_count, setUsed_count] = useState(0);
-  const [send_enable, setSend_enable] = useState(false);
-  const [successStatus, setSuccessStatus] = useState([]);
-  const [errorStatus, setErrorStatus] = useState([]);
+  const [ecount, setEcount] = useState(0);
+  const [scount, setScount] = useState(0);
+  const [sfcount, setSfcount] = useState(0);
+  const [stcount, setStcount] = useState(0);
+  const [usedCount, setUsedCount] = useState(0);
+  const [namCount, setNamCount] = useState(0);
+  const [subCount, setSubCount] = useState(0);
+  const [senEmailsCount, setSenEmailsCount] = useState(0);
+  const [mesTitle, setMesTitle] = useState('');
+  const [attTitle, setAttTitle] = useState('');
+  const [ranNamStatus, setRanNamStatus] = useState(false);
+  const [ranSubStatus, setRanSubStatus] = useState(false);
+  const [ranSenEmaStatus, setRanSenEmaStatus] = useState(false);
+  const [limit, setLimit] = useState(100);
+  const [couPerReplace, setCouPerReplace] = useState(1000);
+  const [sendEnable, setSendEnable] = useState(false);
+  const [successStatus, setSuccessStatus] = useState<number[]>([]);
+  const [errorStatus, setErrorStatus] = useState<number[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [failedCount, setFailedCount] = useState(0);
-  const [servers, setServers] = useState([]);
+  const [servers, setServers] = useState<string[]>([]);
   const [finished, setFinished] = useState(false);
 
   useEffect(() => {
-    if (e_count && s_count && used_count && used_count <= s_count)
-      setSend_enable(true);
-    else setSend_enable(false);
-  }, [e_count, s_count, used_count]);
+    if (
+      ecount &&
+      scount &&
+      usedCount &&
+      usedCount <= scount &&
+      namCount &&
+      senEmailsCount &&
+      subCount &&
+      mesTitle
+    )
+      setSendEnable(true);
+    else setSendEnable(false);
+  }, [ecount, scount, usedCount, namCount, senEmailsCount, subCount, mesTitle]);
 
   useEffect(() => {
-    if (e_count && totalCount + failedCount === e_count) {
+    if (ecount && totalCount + failedCount === ecount) {
       setFinished(true);
     }
-  }, [totalCount, failedCount]);
+  }, [totalCount, failedCount, ecount]);
 
   const emailUpload = (): void => {
-    window.electron.ipcRenderer.on('email-upload', (event, args) => {
-      setE_count(args);
-    });
+    window.electron.ipcRenderer.on(
+      'email-upload',
+      (event: IpcMainEvent, args: number) => {
+        setEcount(args);
+      }
+    );
     window.electron.ipcRenderer.send('email-upload');
   };
 
   const serverUpload = (): void => {
-    window.electron.ipcRenderer.on('server-upload', (event, args) => {
-      setS_count(args.successLength);
-      setSf_count(args.failedLength);
-      setServers(args.data);
-    });
-    window.electron.ipcRenderer.on('total-server', (event, args) => {
-      setSt_count(args);
-    });
+    window.electron.ipcRenderer.on(
+      'server-upload',
+      (event: IpcMainEvent, args: UplSerData) => {
+        setScount(args.successLength);
+        setSfcount(args.failedLength);
+        setServers(args.data);
+      }
+    );
+    window.electron.ipcRenderer.on(
+      'total-server',
+      (event: IpcMainEvent, args: number) => {
+        setStcount(args);
+      }
+    );
     window.electron.ipcRenderer.send('server-upload');
+  };
+
+  const namesUpload = (): void => {
+    window.electron.ipcRenderer.on(
+      'names-upload',
+      (event: IpcMainEvent, args: number) => {
+        setNamCount(args);
+      }
+    );
+    window.electron.ipcRenderer.send('names-upload');
+  };
+
+  const subjectsUpload = (): void => {
+    window.electron.ipcRenderer.on(
+      'subjects-upload',
+      (event: IpcMainEvent, args: number) => {
+        setSubCount(args);
+      }
+    );
+    window.electron.ipcRenderer.send('subjects-upload');
+  };
+
+  const senEmailsUpload = (): void => {
+    window.electron.ipcRenderer.on(
+      'senEmails-upload',
+      (event: IpcMainEvent, args: number) => {
+        setSenEmailsCount(args);
+      }
+    );
+    window.electron.ipcRenderer.send('senEmails-upload');
+  };
+
+  const messageUpload = (): void => {
+    window.electron.ipcRenderer.on(
+      'message-upload',
+      (event: IpcMainEvent, args: string) => {
+        setMesTitle(args);
+      }
+    );
+    window.electron.ipcRenderer.send('message-upload');
+  };
+
+  const attachementUpload = (): void => {
+    window.electron.ipcRenderer.on(
+      'attachement-upload',
+      (event: IpcMainEvent, args: string) => {
+        setAttTitle(args);
+      }
+    );
+    window.electron.ipcRenderer.send('attachement-upload');
   };
 
   const handleSend = (): void => {
     setFinished(false);
-    let zeroArr = [];
-    for (let i = 0; i < used_count; i++) {
-      zeroArr.push(0);
-    }
-    let sArr = [...zeroArr];
-    let eArr = [...zeroArr];
+    const successMails: number[] = [];
+    const failedMails: number[] = [];
     let tCount = 0;
     let fCount = 0;
-    setSuccessStatus(zeroArr);
-    setErrorStatus(zeroArr);
-    window.electron.ipcRenderer.send('send-action', used_count);
-    window.electron.ipcRenderer.on('sending-success', (event, server_num) => {
-      sArr = [...sArr];
-      setTotalCount(++tCount);
-      sArr[server_num] = 1 + sArr[server_num];
-      setSuccessStatus(sArr);
+    for (let i = 0; i < usedCount; i += 1) {
+      successMails.push(0);
+      failedMails.push(0);
+    }
+    setSuccessStatus(successMails);
+    setErrorStatus(failedMails);
+    window.electron.ipcRenderer.send('send-action', {
+      ranNamStatus,
+      ranSenEmaStatus,
+      ranSubStatus,
+      usedCount,
+      limit,
+      couPerReplace,
     });
-    window.electron.ipcRenderer.on('sending-error', (event, server_num) => {
-      eArr = [...eArr];
-      setFailedCount(++fCount);
-      eArr[server_num]++;
-      setErrorStatus(eArr);
-    });
+    window.electron.ipcRenderer.on(
+      'sending-success',
+      (event: IpcMainEvent, args: ResponseData): void => {
+        successMails[args.serverNum] += args.count;
+        tCount += args.count;
+        setTotalCount(tCount);
+        setSuccessStatus(successMails);
+      }
+    );
+    window.electron.ipcRenderer.on(
+      'sending-error',
+      (event: IpcMainEvent, args: ResponseData): void => {
+        failedMails[args.serverNum] += args.count;
+        fCount += args.count;
+        setFailedCount(fCount);
+        setErrorStatus(failedMails);
+      }
+    );
   };
 
   return (
@@ -109,32 +206,39 @@ const Hello = () => {
         <Grid container>
           <Grid item xs={4}>
             <Paper elevation={5} sx={{ mr: 2 }}>
-              <Box p={2}>
-                <Box display="flex" alignItems="center" marginBottom="20px">
+              <Box px={2} py={1}>
+                <Box display="flex" alignItems="center" marginBottom="10px">
                   <Button
                     color="success"
-                    size="medium"
+                    size="small"
                     variant="contained"
                     sx={{ marginRight: '20px', width: '190px' }}
                     onClick={emailUpload}
                   >
-                    Upload EmailList
+                    EmailList
                   </Button>
-                  <Typography>{e_count} emails</Typography>
+                  <Typography>{ecount} emails</Typography>
                 </Box>
                 <Box display="flex" alignItems="center">
                   <Button
                     color="success"
-                    size="medium"
+                    size="small"
                     variant="contained"
                     sx={{ marginRight: '20px', width: '190px' }}
                     onClick={serverUpload}
                   >
-                    Upload ServerList
+                    ServerList
                   </Button>
-                  <Typography>
-                    Working/not({st_count}):{s_count}/{sf_count}
-                  </Typography>
+                  {stcount === scount + sfcount ? (
+                    <Typography>
+                      Working/not({stcount}):{scount}/{sfcount}
+                    </Typography>
+                  ) : (
+                    <CircularProgress
+                      variant="determinate"
+                      value={((scount + sfcount) * 100) / stcount}
+                    />
+                  )}
                 </Box>
               </Box>
               <Divider />
@@ -145,31 +249,150 @@ const Hello = () => {
               <Divider />
 
               <Box p={1}>
-                <Typography>
-                  How many servers do you want to use simultaneously?
-                </Typography>
-                <Box display="flex" alignItems="center" marginBottom="20px">
-                  <Typography marginRight="20px">
-                    Total Servers: {s_count}
-                  </Typography>
-                  <Input
-                    placeholder="count of servers"
-                    onChange={(ev) => setUsed_count(parseInt(ev.target.value))}
+                <Box p={1} pt={0} display="flex" alignContent="space-between">
+                  <Button
+                    color="success"
+                    size="small"
+                    variant="contained"
+                    sx={{ marginRight: '20px', width: '190px' }}
+                    onClick={namesUpload}
+                  >
+                    {namCount > 0 ? `${namCount} names` : 'Names'}
+                  </Button>
+                  <FormControlLabel
+                    label="Randomize"
+                    control={
+                      <Checkbox
+                        size="small"
+                        onChange={(event: any) =>
+                          setRanNamStatus(event.target.checked)
+                        }
+                      />
+                    }
                   />
+                </Box>
+                <Box p={1} pt={0} display="flex" alignContent="space-between">
+                  <Button
+                    color="success"
+                    size="small"
+                    variant="contained"
+                    sx={{ marginRight: '20px', width: '190px' }}
+                    onClick={senEmailsUpload}
+                  >
+                    {senEmailsCount > 0
+                      ? `${senEmailsCount} emails`
+                      : 'Sender Emails'}
+                  </Button>
+                  <FormControlLabel
+                    label="Randomize"
+                    control={
+                      <Checkbox
+                        size="small"
+                        onChange={(event: any) =>
+                          setRanSenEmaStatus(event.target.checked)
+                        }
+                      />
+                    }
+                  />
+                </Box>
+                <Box p={1} pt={0} display="flex" alignContent="space-between">
+                  <Button
+                    color="success"
+                    size="small"
+                    variant="contained"
+                    sx={{ marginRight: '20px', width: '190px' }}
+                    onClick={subjectsUpload}
+                  >
+                    {subCount > 0 ? `${subCount} subjects` : 'Subjects'}
+                  </Button>
+                  <FormControlLabel
+                    label="Randomize"
+                    control={
+                      <Checkbox
+                        size="small"
+                        onChange={(event: any) =>
+                          setRanSubStatus(event.target.checked)
+                        }
+                      />
+                    }
+                  />
+                </Box>
+                <Box p={1} pt={0} display="flex" alignItems="center">
+                  <Button
+                    color="success"
+                    size="small"
+                    variant="contained"
+                    sx={{ marginRight: '20px', width: '190px' }}
+                    onClick={messageUpload}
+                  >
+                    messageLetter
+                  </Button>
+                  <Typography>{mesTitle}</Typography>
+                </Box>
+                <Box p={1} pt={0} display="flex" alignItems="center">
+                  <Button
+                    color="success"
+                    size="small"
+                    variant="contained"
+                    sx={{ marginRight: '20px', width: '190px' }}
+                    onClick={attachementUpload}
+                  >
+                    Attachement
+                  </Button>
+                  <Typography>{attTitle}</Typography>
                 </Box>
               </Box>
               <Divider />
 
-              <Box p={3}>
+              <Box p={1} textAlign="center">
+                <Typography>Server Options:</Typography>
+              </Box>
+              <Divider />
+
+              <Box p={1}>
+                <Box p={1} pt={0} display="flex" alignContent="space-between">
+                  <Typography sx={{ marginRight: '20px' }}>Count:</Typography>
+                  <Input
+                    sx={{ border: '2px solid green' }}
+                    placeholder="count of used servers"
+                    onChange={(event: any): void =>
+                      setUsedCount(Number(event.target.value))
+                    }
+                  />
+                </Box>
+                <Box p={1} pt={0} display="flex" alignContent="space-between">
+                  <Typography sx={{ marginRight: '20px' }}>Limit:</Typography>
+                  <Slider
+                    sx={{ marginRight: '20px' }}
+                    value={limit}
+                    onChange={(event: any, value: number): void =>
+                      setLimit(value)
+                    }
+                    aria-labelledby="input-slider"
+                  />
+                  <Typography>{limit}</Typography>
+                </Box>
+              </Box>
+
+              <Box p={2} display="flex" alignContent="space-around">
                 <Button
+                  sx={{ marginRight: '20px' }}
                   color="primary"
                   size="medium"
                   variant="contained"
-                  disabled={!send_enable}
+                  disabled={!sendEnable}
                   onClick={handleSend}
                 >
                   Send
                 </Button>
+                <Input
+                  placeholder="emails per replace"
+                  sx={{ border: '2px solid green' }}
+                  value={couPerReplace}
+                  onCheck={(event: any): void =>
+                    setCouPerReplace(Number(event.target.value))
+                  }
+                />
               </Box>
               {finished && (
                 <Box textAlign="center">
@@ -180,14 +403,15 @@ const Hello = () => {
               )}
             </Paper>
           </Grid>
+
           <Grid item xs={8}>
             <Paper elevation={5}>
               <Box p={2}>
                 <Box display="flex" justifyContent="space-around">
                   <Typography variant="h6">Shpping Log</Typography>
                   <Typography variant="h6">
-                    Total Servers: {s_count}
-                    <span style={{ color: 'red' }}>({used_count} used)</span>
+                    Total Servers: {scount}
+                    <span style={{ color: 'red' }}>({usedCount} used)</span>
                   </Typography>
                   <Typography variant="h6">
                     Total emails sent:{' '}
